@@ -51,7 +51,7 @@ export function TitleOverlay({ s }: { s: SequenceState }) {
           className="font-sans text-[0.58rem] uppercase tracking-[0.44em]"
           style={{ color: "rgba(242,240,234,0.5)" }}
         >
-          Enter the gallery
+          Scroll to explore
         </span>
         <span className="h-9 w-px" style={{ background: "linear-gradient(#C9A84C, transparent)" }} />
       </div>

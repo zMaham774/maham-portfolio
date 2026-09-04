@@ -1,4 +1,4 @@
-import type {} from "@react-three/fiber";
+import type { } from "@react-three/fiber";
 
 /** Continuous emissive ribbon where the walls meet the floor. */
 export function LightStrip({

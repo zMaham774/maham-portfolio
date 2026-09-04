@@ -1,5 +1,5 @@
 import { MeshReflectorMaterial } from "@react-three/drei";
-import type {} from "@react-three/fiber";
+import type { } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { Portals } from "./Portals";
@@ -37,7 +37,20 @@ function WallSeams({ side, reveal }: { side: -1 | 1; reveal: number }) {
   );
 }
 
-export function Gallery({ reveal, floor }: { reveal: number; floor: number }) {
+export function Gallery({
+  reveal,
+  floor,
+  open = 0,
+}: {
+  reveal: number;
+  floor: number;
+  /** 0..1 — the corridor widens and dissolves as the chamber takes over */
+  open?: number;
+}) {
+  // walls swing outward and dim as the volume opens up
+  const spread = WALL_X + open * 22;
+  const solidity = 1 - open;
+
   return (
     <group>
       {/* reflective floor */}
@@ -60,7 +73,7 @@ export function Gallery({ reveal, floor }: { reveal: number; floor: number }) {
 
       {/* side walls — dark mirror panelling */}
       {([-1, 1] as const).map((side) => (
-        <group key={side}>
+        <group key={side} position={[side * (spread - WALL_X), 0, 0]}>
           <mesh
             position={[side * WALL_X, WALL_H / 2, HALL_Z]}
             rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}
@@ -72,10 +85,12 @@ export function Gallery({ reveal, floor }: { reveal: number; floor: number }) {
               roughness={0.28}
               emissive="#0b1119"
               emissiveIntensity={0.25 * reveal}
+              transparent
+              opacity={Math.max(0.02, solidity)}
               side={THREE.DoubleSide}
             />
           </mesh>
-          <WallSeams side={side} reveal={reveal} />
+          <WallSeams side={side} reveal={reveal * solidity} />
         </group>
       ))}
 
@@ -88,29 +103,45 @@ export function Gallery({ reveal, floor }: { reveal: number; floor: number }) {
           roughness={0.85}
           emissive="#0b1a2e"
           emissiveIntensity={0.5 * reveal}
+          transparent
+          opacity={Math.max(0.02, solidity)}
         />
       </mesh>
       <pointLight
         position={[0, WALL_H - 1.2, -20]}
         color="#4f7fb8"
-        intensity={6 * reveal}
+        intensity={6 * reveal * solidity}
         distance={70}
         decay={2}
       />
 
-      <LightStrip wallX={WALL_X} intensity={floor} length={HALL_LEN} zCenter={HALL_Z} />
-      <Portals wallX={WALL_X} reveal={reveal} />
+      <LightStrip
+        wallX={spread}
+        intensity={floor * (0.35 + 0.65 * solidity)}
+        length={HALL_LEN}
+        zCenter={HALL_Z}
+      />
+      <Portals wallX={spread} reveal={reveal * solidity} />
 
-      {/* far end wall + distant focal aperture */}
-      <mesh position={[0, WALL_H / 2, HALL_END]}>
-        <planeGeometry args={[WALL_X * 2, WALL_H]} />
-        <meshStandardMaterial color="#05070c" metalness={0.8} roughness={0.4} />
-      </mesh>
+      {/* far end wall — dissolves to let the chamber through */}
+      {solidity > 0.02 && (
+        <mesh position={[0, WALL_H / 2, HALL_END]}>
+          <planeGeometry args={[WALL_X * 2, WALL_H]} />
+          <meshStandardMaterial
+            color="#05070c"
+            metalness={0.8}
+            roughness={0.4}
+            transparent
+            opacity={solidity}
+          />
+        </mesh>
+      )}
     </group>
   );
 }
 
 export function FocalPoint({ glow }: { glow: number }) {
+  if (glow <= 0.01) return null;
   return (
     <group position={[0, 3.2, HALL_END + 0.6]}>
       <mesh>

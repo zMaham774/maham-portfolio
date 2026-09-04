@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { OpeningScene } from "@/components/opening/OpeningScene";
 
+const TITLE = "Maham Zafar — Opening Sequence";
+const DESCRIPTION =
+  "A cinematic reveal: from a near-black void, a futuristic exhibition gallery of glowing golden apertures opens around you.";
+
 export const metadata: Metadata = {
-  title: "Maham Zafar — Opening Sequence",
-  description:
-    "A cinematic reveal: from a near-black void, a futuristic exhibition gallery of glowing golden apertures opens around you.",
+  title: TITLE,
+  description: DESCRIPTION,
   openGraph: {
-    title: "Maham Zafar — Opening Sequence",
-    description:
-      "A cinematic reveal: from a near-black void, a futuristic exhibition gallery of glowing golden apertures opens around you.",
+    title: TITLE,
+    description: DESCRIPTION,
     type: "website",
   },
   twitter: {

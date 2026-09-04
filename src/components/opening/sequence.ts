@@ -8,6 +8,8 @@ export type SequenceState = {
   camZ: number;
   /** camera height */
   camY: number;
+  /** lateral camera offset — only used inside the chamber */
+  camX: number;
   /** fog far plane — pulls back as the gallery reveals */
   fogFar: number;
   /** 0..1 master reveal of architecture */
@@ -20,20 +22,34 @@ export type SequenceState = {
   title: number;
   /** subtitle + hint opacity */
   hint: number;
+  /** 0..1 corridor walls widen and dissolve into the chamber volume */
+  open: number;
+  /** 0..1 chamber architecture presence */
+  chamber: number;
+  /** 0..1 About HTML content opacity */
+  about: number;
+  /** normalized scroll progress once the intro handed over */
+  scroll: number;
 };
 
 export const START: SequenceState = {
   camZ: 46,
   camY: 1.85,
+  camX: 0,
   fogFar: 6,
   reveal: 0,
   glow: 0,
   floor: 0,
   title: 0,
   hint: 0,
+  open: 0,
+  chamber: 0,
+  about: 0,
+  scroll: 0,
 };
 
 export const END: SequenceState = {
+  ...START,
   camZ: -4,
   camY: 1.7,
   fogFar: 130,
@@ -46,6 +62,48 @@ export const END: SequenceState = {
 
 export function createSequenceState(): SequenceState {
   return { ...START };
+}
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const range = (v: number, a: number, b: number) => clamp01((v - a) / (b - a));
+const smooth = (v: number) => v * v * (3 - 2 * v);
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** Where the corridor phase ends and the chamber begins, in world Z. */
+export const CORRIDOR_EXIT_Z = -70;
+export const CHAMBER_STOP_Z = -110;
+
+/**
+ * Phase 2: scroll drives the same shared state object the intro timeline used,
+ * so every consumer in the scene keeps reading plain numbers each frame.
+ */
+export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
+  const target = clamp01(p);
+  // Frame-rate independent easing on top of Lenis: absorbs any wheel spike or
+  // dropped frame so the corridor→chamber handover never snaps.
+  const k = 1 - Math.pow(0.0001, Math.min(dt, 0.1));
+  const t = (s.scroll = s.scroll + (target - s.scroll) * k);
+
+  // forward travel: corridor, then into the chamber — both ends ease to zero
+  // velocity at the doorway, so the handover reads as one continuous glide
+  s.camZ =
+    t < 0.62
+      ? lerp(END.camZ, CORRIDOR_EXIT_Z, smooth(range(t, 0, 0.62)))
+      : lerp(CORRIDOR_EXIT_Z, CHAMBER_STOP_Z, smooth(range(t, 0.62, 1)));
+
+  // walls widen / fall away, volume grows — long, overlapping ramps
+  s.open = smooth(range(t, 0.42, 0.8));
+  s.chamber = smooth(range(t, 0.46, 0.86));
+  s.about = smooth(range(t, 0.78, 0.96));
+
+  s.fogFar = lerp(END.fogFar, 230, smooth(range(t, 0.4, 0.9)));
+  s.camY = lerp(END.camY, 2.35, smooth(range(t, 0.6, 1)));
+  s.glow = Math.max(0, 1 - s.open * 1.5);
+  s.hint = 1 - clamp01(t * 6);
+
+  // lateral drift only once the room is around you — sweeps left, then right
+  const cp = smooth(range(t, 0.66, 1));
+  s.camX = Math.sin(cp * Math.PI * 2) * 7.2 * s.chamber;
 }
 
 /**
@@ -91,3 +149,6 @@ export function buildTimeline(s: SequenceState, reducedMotion: boolean) {
 
   return tl;
 }
+
+/** Total intro duration, after which scroll takes over. */
+export const INTRO_DURATION = 14.6;
