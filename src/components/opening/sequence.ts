@@ -8,6 +8,8 @@ export type SequenceState = {
   camZ: number;
   /** camera height */
   camY: number;
+  /** world height the camera aims at */
+  lookY: number;
   /** lateral camera offset — only used inside the chamber */
   camX: number;
   /** fog far plane — pulls back as the gallery reveals */
@@ -28,13 +30,21 @@ export type SequenceState = {
   chamber: number;
   /** 0..1 About HTML content opacity */
   about: number;
+  /** 0..1 hairlines drifting in the void before the lattice resolves */
+  threads: number;
+  /** 0..1 skill node points present */
+  nodes: number;
+  /** 0..1 connections drawn + labels resolved by proximity */
+  links: number;
   /** normalized scroll progress once the intro handed over */
   scroll: number;
 };
 
+
 export const START: SequenceState = {
   camZ: 46,
   camY: 1.85,
+  lookY: 3.1,
   camX: 0,
   fogFar: 6,
   reveal: 0,
@@ -45,7 +55,11 @@ export const START: SequenceState = {
   open: 0,
   chamber: 0,
   about: 0,
+  threads: 0,
+  nodes: 0,
+  links: 0,
   scroll: 0,
+
 };
 
 export const END: SequenceState = {
@@ -72,6 +86,8 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** Where the corridor phase ends and the chamber begins, in world Z. */
 export const CORRIDOR_EXIT_Z = -70;
 export const CHAMBER_STOP_Z = -110;
+/** Where the camera settles inside the skills lattice. */
+export const NETWORK_STOP_Z = -200;
 
 /**
  * Phase 2: scroll drives the same shared state object the intro timeline used,
@@ -84,27 +100,50 @@ export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
   const k = 1 - Math.pow(0.0001, Math.min(dt, 0.1));
   const t = (s.scroll = s.scroll + (target - s.scroll) * k);
 
-  // forward travel: corridor, then into the chamber — both ends ease to zero
-  // velocity at the doorway, so the handover reads as one continuous glide
+  // forward travel: corridor → chamber → out of the chamber into the lattice.
+  // every leg eases to zero velocity at its seam, so it reads as one glide
   s.camZ =
-    t < 0.62
-      ? lerp(END.camZ, CORRIDOR_EXIT_Z, smooth(range(t, 0, 0.62)))
-      : lerp(CORRIDOR_EXIT_Z, CHAMBER_STOP_Z, smooth(range(t, 0.62, 1)));
+    t < 0.28
+      ? lerp(END.camZ, CORRIDOR_EXIT_Z, smooth(range(t, 0, 0.28)))
+      : t < 0.6
+        ? lerp(CORRIDOR_EXIT_Z, CHAMBER_STOP_Z, smooth(range(t, 0.28, 0.6)))
+        : lerp(CHAMBER_STOP_Z, NETWORK_STOP_Z, smooth(range(t, 0.6, 1)));
 
   // walls widen / fall away, volume grows — long, overlapping ramps
-  s.open = smooth(range(t, 0.42, 0.8));
-  s.chamber = smooth(range(t, 0.46, 0.86));
-  s.about = smooth(range(t, 0.78, 0.96));
+  s.open = smooth(range(t, 0.19, 0.36));
 
-  s.fogFar = lerp(END.fogFar, 230, smooth(range(t, 0.4, 0.9)));
-  s.camY = lerp(END.camY, 2.35, smooth(range(t, 0.6, 1)));
+  // chamber architecture rises, then dissolves back into the void
+  const dissolve = 1 - smooth(range(t, 0.62, 0.78));
+  s.chamber = smooth(range(t, 0.21, 0.39)) * dissolve;
+  s.about = smooth(range(t, 0.35, 0.44)) * (1 - smooth(range(t, 0.58, 0.68)));
+
+  // the floor keeps a soft light through the lattice — never full darkness
+  s.floor = 1 - smooth(range(t, 0.62, 0.8)) * 0.45;
+
+  // network beats: hairlines → isolated points → connections
+  s.threads = smooth(range(t, 0.64, 0.78)) * (1 - smooth(range(t, 0.93, 1)) * 0.5);
+  s.nodes = smooth(range(t, 0.71, 0.87));
+  s.links = smooth(range(t, 0.78, 0.97));
+
+  s.fogFar = lerp(
+    lerp(END.fogFar, 230, smooth(range(t, 0.18, 0.55))),
+    320,
+    smooth(range(t, 0.6, 0.88))
+  );
+  s.camY = lerp(lerp(END.camY, 2.35, smooth(range(t, 0.3, 0.55))), 5.2, smooth(range(t, 0.62, 1)));
+  // raise the aim so the whole lattice sits above the floor, fully in frame
+  s.lookY = lerp(3.1, 12.4, smooth(range(t, 0.6, 0.86)));
   s.glow = Math.max(0, 1 - s.open * 1.5);
   s.hint = 1 - clamp01(t * 6);
 
-  // lateral drift only once the room is around you — sweeps left, then right
-  const cp = smooth(range(t, 0.66, 1));
-  s.camX = Math.sin(cp * Math.PI * 2) * 7.2 * s.chamber;
+  // lateral drift: sweep the chamber, then wander through the lattice
+  const cp = smooth(range(t, 0.3, 0.6));
+  const np = smooth(range(t, 0.66, 1));
+  s.camX =
+    Math.sin(cp * Math.PI * 2) * 7.2 * s.chamber + Math.sin(np * Math.PI * 2) * 2.6 * s.nodes;
+
 }
+
 
 /**
  * Master cinematic timeline. Every visual beat is driven from this one clock,

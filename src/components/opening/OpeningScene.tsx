@@ -9,6 +9,8 @@ import * as THREE from "three";
 import type gsap from "gsap";
 import { Gallery, FocalPoint } from "./Gallery";
 import { Chamber } from "./Chamber";
+import { SkillsNetwork } from "./SkillsNetwork";
+
 import {
   applyScroll,
   buildTimeline,
@@ -18,6 +20,7 @@ import {
 } from "./sequence";
 import { TitleOverlay } from "./TitleOverlay";
 import { AboutOverlay } from "./AboutOverlay";
+import { SkillPanel } from "./SkillPanel";
 
 type Scroll = { p: number; live: boolean };
 
@@ -61,7 +64,7 @@ function Rig({
       s.camY + Math.sin(t * 0.27) * 0.045,
       s.camZ
     );
-    camera.lookAt(s.camX * 0.42 + Math.sin(t * 0.11) * 0.22, 3.1, s.camZ - 40);
+    camera.lookAt(s.camX * 0.42 + Math.sin(t * 0.11) * 0.22, s.lookY, s.camZ - 40);
     const cam = camera as THREE.PerspectiveCamera;
     cam.fov = 46 + Math.sin(t * 0.13) * 0.5;
     cam.updateProjectionMatrix();
@@ -77,7 +80,16 @@ function Rig({
  * every frame) keeps the fades smooth without re-rendering the tree at 60fps.
  */
 function RevealedGallery({ s }: { s: SequenceState }) {
-  const [vals, setVals] = useState({ reveal: 0, floor: 0, glow: 0, open: 0, chamber: 0 });
+  const [vals, setVals] = useState({
+    reveal: 0,
+    floor: 0,
+    glow: 0,
+    open: 0,
+    chamber: 0,
+    threads: 0,
+    nodes: 0,
+    links: 0,
+  });
   const acc = useRef(0);
 
   useFrame((_, delta) => {
@@ -89,7 +101,10 @@ function RevealedGallery({ s }: { s: SequenceState }) {
       Math.abs(vals.floor - s.floor) > 0.002 ||
       Math.abs(vals.glow - s.glow) > 0.002 ||
       Math.abs(vals.open - s.open) > 0.002 ||
-      Math.abs(vals.chamber - s.chamber) > 0.002
+      Math.abs(vals.chamber - s.chamber) > 0.002 ||
+      Math.abs(vals.threads - s.threads) > 0.002 ||
+      Math.abs(vals.nodes - s.nodes) > 0.002 ||
+      Math.abs(vals.links - s.links) > 0.002
     ) {
       setVals({
         reveal: s.reveal,
@@ -97,6 +112,9 @@ function RevealedGallery({ s }: { s: SequenceState }) {
         glow: s.glow,
         open: s.open,
         chamber: s.chamber,
+        threads: s.threads,
+        nodes: s.nodes,
+        links: s.links,
       });
     }
   });
@@ -106,9 +124,11 @@ function RevealedGallery({ s }: { s: SequenceState }) {
       <Gallery reveal={vals.reveal} floor={vals.floor} open={vals.open} />
       <FocalPoint glow={vals.glow} />
       <Chamber p={vals.chamber} />
+      <SkillsNetwork threads={vals.threads} nodes={vals.nodes} links={vals.links} />
     </>
   );
 }
+
 
 export function OpeningScene() {
   const s = useMemo(() => createSequenceState(), []);
@@ -174,9 +194,11 @@ export function OpeningScene() {
         </Canvas>
         <TitleOverlay s={s} />
         <AboutOverlay s={s} />
+        <SkillPanel />
       </div>
-      {/* scroll runway — drives the camera through the gallery into the chamber */}
-      <div aria-hidden className="pointer-events-none h-[700vh] w-full" />
+      {/* scroll runway — corridor → About chamber → skills network */}
+      <div aria-hidden className="pointer-events-none h-[1200vh] w-full" />
+
     </>
   );
 }
