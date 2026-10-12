@@ -36,6 +36,10 @@ export type SequenceState = {
   nodes: number;
   /** 0..1 connections drawn + labels resolved by proximity */
   links: number;
+  /** network lines extend into a long architectural light field */
+  lineBridge: number;
+  /** 0..1 exhibition room and content reveal */
+  gallery: number;
   /** normalized scroll progress once the intro handed over */
   scroll: number;
 };
@@ -58,6 +62,8 @@ export const START: SequenceState = {
   threads: 0,
   nodes: 0,
   links: 0,
+  lineBridge: 0,
+  gallery: 0,
   scroll: 0,
 
 };
@@ -88,6 +94,7 @@ export const CORRIDOR_EXIT_Z = -70;
 export const CHAMBER_STOP_Z = -110;
 /** Where the camera settles inside the skills lattice. */
 export const NETWORK_STOP_Z = -200;
+export const GALLERY_STOP_Z = -336;
 
 /**
  * Phase 2: scroll drives the same shared state object the intro timeline used,
@@ -100,14 +107,16 @@ export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
   const k = 1 - Math.pow(0.0001, Math.min(dt, 0.1));
   const t = (s.scroll = s.scroll + (target - s.scroll) * k);
 
-  // forward travel: corridor → chamber → out of the chamber into the lattice.
+  // forward travel: corridor → chamber → lattice → exhibition.
   // every leg eases to zero velocity at its seam, so it reads as one glide
   s.camZ =
     t < 0.28
       ? lerp(END.camZ, CORRIDOR_EXIT_Z, smooth(range(t, 0, 0.28)))
       : t < 0.6
         ? lerp(CORRIDOR_EXIT_Z, CHAMBER_STOP_Z, smooth(range(t, 0.28, 0.6)))
-        : lerp(CHAMBER_STOP_Z, NETWORK_STOP_Z, smooth(range(t, 0.6, 1)));
+        : t < 0.83
+          ? lerp(CHAMBER_STOP_Z, NETWORK_STOP_Z, smooth(range(t, 0.6, 0.83)))
+          : lerp(NETWORK_STOP_Z, GALLERY_STOP_Z, smooth(range(t, 0.83, 0.98)));
 
   // walls widen / fall away, volume grows — long, overlapping ramps
   s.open = smooth(range(t, 0.19, 0.36));
@@ -121,24 +130,27 @@ export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
   s.floor = 1 - smooth(range(t, 0.62, 0.8)) * 0.45;
 
   // network beats: hairlines → isolated points → connections
-  s.threads = smooth(range(t, 0.64, 0.78)) * (1 - smooth(range(t, 0.93, 1)) * 0.5);
-  s.nodes = smooth(range(t, 0.71, 0.87));
-  s.links = smooth(range(t, 0.78, 0.97));
+  s.threads = smooth(range(t, 0.64, 0.73)) * (1 - smooth(range(t, 0.82, 0.9)));
+  s.nodes = smooth(range(t, 0.7, 0.78)) * (1 - smooth(range(t, 0.83, 0.89)));
+  s.links = smooth(range(t, 0.74, 0.81)) * (1 - smooth(range(t, 0.89, 0.95)));
+  s.lineBridge = smooth(range(t, 0.84, 0.91)) * (1 - smooth(range(t, 0.96, 1)) * 0.6);
+  s.gallery = smooth(range(t, 0.89, 0.97));
 
   s.fogFar = lerp(
     lerp(END.fogFar, 230, smooth(range(t, 0.18, 0.55))),
     320,
     smooth(range(t, 0.6, 0.88))
   );
-  s.camY = lerp(lerp(END.camY, 2.35, smooth(range(t, 0.3, 0.55))), 5.2, smooth(range(t, 0.62, 1)));
+  s.camY = lerp(lerp(lerp(END.camY, 2.35, smooth(range(t, 0.3, 0.55))), 5.2, smooth(range(t, 0.62, 0.83))), 5, smooth(range(t, 0.83, 0.97)));
   // raise the aim so the whole lattice sits above the floor, fully in frame
-  s.lookY = lerp(3.1, 12.4, smooth(range(t, 0.6, 0.86)));
+  s.lookY = lerp(lerp(3.1, 12.4, smooth(range(t, 0.6, 0.81))), 9.5, smooth(range(t, 0.85, 0.98)));
   s.glow = Math.max(0, 1 - s.open * 1.5);
+  s.title = 0;
   s.hint = 1 - clamp01(t * 6);
 
   // lateral drift: sweep the chamber, then wander through the lattice
   const cp = smooth(range(t, 0.3, 0.6));
-  const np = smooth(range(t, 0.66, 1));
+  const np = smooth(range(t, 0.66, 0.83));
   s.camX =
     Math.sin(cp * Math.PI * 2) * 7.2 * s.chamber + Math.sin(np * Math.PI * 2) * 2.6 * s.nodes;
 

@@ -21,6 +21,8 @@ import {
 import { TitleOverlay } from "./TitleOverlay";
 import { AboutOverlay } from "./AboutOverlay";
 import { SkillPanel } from "./SkillPanel";
+import { ProjectsGallery } from "./ProjectsGallery";
+import { ProjectsOverlay } from "./ProjectsOverlay";
 
 type Scroll = { p: number; live: boolean };
 
@@ -51,7 +53,7 @@ function Rig({
     if (!start.current) start.current = performance.now();
     const elapsed = (performance.now() - start.current) / 1000;
 
-    if (scroll.current.live && elapsed >= INTRO_DURATION) {
+    if (scroll.current.live) {
       // Phase 2 — scroll owns the same shared state object.
       applyScroll(s, scroll.current.p, delta);
     } else if (tl.current) {
@@ -61,12 +63,13 @@ function Rig({
 
     camera.position.set(
       s.camX + Math.sin(t * 0.18) * 0.14,
-      s.camY + Math.sin(t * 0.27) * 0.045,
-      s.camZ
+      s.camY + Math.sin(t * 0.27) * 0.045 + (state.size.width < 800 ? 5 * s.gallery : 0),
+      s.camZ + (state.size.width >= 800 && state.size.height > state.size.width ? 26 * s.gallery : 0)
     );
-    camera.lookAt(s.camX * 0.42 + Math.sin(t * 0.11) * 0.22, s.lookY, s.camZ - 40);
+    camera.lookAt(s.camX * 0.42 + Math.sin(t * 0.11) * 0.22, s.lookY + (state.size.width < 800 ? 5 * s.gallery : 0), s.camZ - 40);
     const cam = camera as THREE.PerspectiveCamera;
-    cam.fov = 46 + Math.sin(t * 0.13) * 0.5;
+    const portrait = state.size.width < state.size.height;
+    cam.fov = 46 + (portrait && state.size.width < 800 ? 2 : -2) * s.gallery + Math.sin(t * 0.13) * 0.5;
     cam.updateProjectionMatrix();
     fog.near = Math.max(0.4, s.fogFar * 0.05);
     fog.far = s.fogFar;
@@ -79,7 +82,7 @@ function Rig({
  * The gallery takes plain numbers. Sampling the timeline ~20x/s (instead of
  * every frame) keeps the fades smooth without re-rendering the tree at 60fps.
  */
-function RevealedGallery({ s }: { s: SequenceState }) {
+function RevealedGallery({ s, selected, onSelect }: { s: SequenceState; selected: number; onSelect: (i: number) => void }) {
   const [vals, setVals] = useState({
     reveal: 0,
     floor: 0,
@@ -89,6 +92,8 @@ function RevealedGallery({ s }: { s: SequenceState }) {
     threads: 0,
     nodes: 0,
     links: 0,
+    lineBridge: 0,
+    gallery: 0,
   });
   const acc = useRef(0);
 
@@ -104,7 +109,9 @@ function RevealedGallery({ s }: { s: SequenceState }) {
       Math.abs(vals.chamber - s.chamber) > 0.002 ||
       Math.abs(vals.threads - s.threads) > 0.002 ||
       Math.abs(vals.nodes - s.nodes) > 0.002 ||
-      Math.abs(vals.links - s.links) > 0.002
+      Math.abs(vals.links - s.links) > 0.002 ||
+      Math.abs(vals.lineBridge - s.lineBridge) > 0.002 ||
+      Math.abs(vals.gallery - s.gallery) > 0.002
     ) {
       setVals({
         reveal: s.reveal,
@@ -115,6 +122,8 @@ function RevealedGallery({ s }: { s: SequenceState }) {
         threads: s.threads,
         nodes: s.nodes,
         links: s.links,
+        lineBridge: s.lineBridge,
+        gallery: s.gallery,
       });
     }
   });
@@ -125,6 +134,7 @@ function RevealedGallery({ s }: { s: SequenceState }) {
       <FocalPoint glow={vals.glow} />
       <Chamber p={vals.chamber} />
       <SkillsNetwork threads={vals.threads} nodes={vals.nodes} links={vals.links} />
+      <ProjectsGallery transition={vals.lineBridge} gallery={vals.gallery} selected={selected} onSelect={onSelect} />
     </>
   );
 }
@@ -134,6 +144,7 @@ export function OpeningScene() {
   const s = useMemo(() => createSequenceState(), []);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
   const scroll = useRef<Scroll>({ p: 0, live: false });
+  const [selected, setSelected] = useState(0);
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -158,6 +169,7 @@ export function OpeningScene() {
       () => {
         scroll.current.live = true;
         lenis.start();
+        scroll.current.p = lenis.limit > 0 ? Math.min(1, Math.max(0, lenis.scroll / lenis.limit)) : 0;
       },
       reduced ? 1200 : INTRO_DURATION * 1000
     );
@@ -185,7 +197,7 @@ export function OpeningScene() {
         >
           <Rig s={s} tl={tlRef} scroll={scroll} />
           <ambientLight intensity={0.035} color="#4a6c96" />
-          <RevealedGallery s={s} />
+          <RevealedGallery s={s} selected={selected} onSelect={setSelected} />
           <EffectComposer>
             <Bloom intensity={0.85} luminanceThreshold={0.45} luminanceSmoothing={0.5} mipmapBlur />
             <Vignette eskil={false} offset={0.25} darkness={0.92} />
@@ -195,9 +207,10 @@ export function OpeningScene() {
         <TitleOverlay s={s} />
         <AboutOverlay s={s} />
         <SkillPanel />
+        <ProjectsOverlay s={s} selected={selected} onSelect={setSelected} />
       </div>
-      {/* scroll runway — corridor → About chamber → skills network */}
-      <div aria-hidden className="pointer-events-none h-[1200vh] w-full" />
+      {/* scroll runway — corridor → About chamber → skills network → projects */}
+      <div aria-hidden className="pointer-events-none h-[1600vh] w-full" />
 
     </>
   );
