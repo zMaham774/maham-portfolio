@@ -23,6 +23,8 @@ import { AboutOverlay } from "./AboutOverlay";
 import { SkillPanel } from "./SkillPanel";
 import { ProjectsGallery } from "./ProjectsGallery";
 import { ProjectsOverlay } from "./ProjectsOverlay";
+import { DepartureChamber } from "./DepartureChamber";
+import { ContactOverlay } from "./ContactOverlay";
 
 type Scroll = { p: number; live: boolean };
 
@@ -63,13 +65,13 @@ function Rig({
 
     camera.position.set(
       s.camX + Math.sin(t * 0.18) * 0.14,
-      s.camY + Math.sin(t * 0.27) * 0.045 + (state.size.width < 800 ? 5 * s.gallery : 0),
-      s.camZ + (state.size.width >= 800 && state.size.height > state.size.width ? 26 * s.gallery : 0)
+      s.camY + Math.sin(t * 0.27) * 0.045 + (state.size.width < 800 ? 5 * s.frame : 0),
+      s.camZ + (state.size.width >= 800 && state.size.height > state.size.width ? 26 * s.frame : 0)
     );
-    camera.lookAt(s.camX * 0.42 + Math.sin(t * 0.11) * 0.22, s.lookY + (state.size.width < 800 ? 5 * s.gallery : 0), s.camZ - 40);
+    camera.lookAt(s.camX * 0.42 + Math.sin(t * 0.11) * 0.22, s.lookY + (state.size.width < 800 ? 5 * s.frame : 0), s.camZ - 40);
     const cam = camera as THREE.PerspectiveCamera;
     const portrait = state.size.width < state.size.height;
-    cam.fov = 46 + (portrait && state.size.width < 800 ? 2 : -2) * s.gallery + Math.sin(t * 0.13) * 0.5;
+    cam.fov = 46 + (portrait && state.size.width < 800 ? 2 : -2) * s.frame + Math.sin(t * 0.13) * 0.5;
     cam.updateProjectionMatrix();
     fog.near = Math.max(0.4, s.fogFar * 0.05);
     fog.far = s.fogFar;
@@ -94,6 +96,8 @@ function RevealedGallery({ s, selected, onSelect }: { s: SequenceState; selected
     links: 0,
     lineBridge: 0,
     gallery: 0,
+    departure: 0,
+    door: 0,
   });
   const acc = useRef(0);
 
@@ -111,7 +115,9 @@ function RevealedGallery({ s, selected, onSelect }: { s: SequenceState; selected
       Math.abs(vals.nodes - s.nodes) > 0.002 ||
       Math.abs(vals.links - s.links) > 0.002 ||
       Math.abs(vals.lineBridge - s.lineBridge) > 0.002 ||
-      Math.abs(vals.gallery - s.gallery) > 0.002
+      Math.abs(vals.gallery - s.gallery) > 0.002 ||
+      Math.abs(vals.departure - s.departure) > 0.002 ||
+      Math.abs(vals.door - s.door) > 0.002
     ) {
       setVals({
         reveal: s.reveal,
@@ -124,6 +130,8 @@ function RevealedGallery({ s, selected, onSelect }: { s: SequenceState; selected
         links: s.links,
         lineBridge: s.lineBridge,
         gallery: s.gallery,
+        departure: s.departure,
+        door: s.door,
       });
     }
   });
@@ -135,6 +143,7 @@ function RevealedGallery({ s, selected, onSelect }: { s: SequenceState; selected
       <Chamber p={vals.chamber} />
       <SkillsNetwork threads={vals.threads} nodes={vals.nodes} links={vals.links} />
       <ProjectsGallery transition={vals.lineBridge} gallery={vals.gallery} selected={selected} onSelect={onSelect} />
+      {vals.departure > 0.002 && vals.gallery <= 0.002 && <DepartureChamber presence={vals.departure} door={vals.door} />}
     </>
   );
 }
@@ -208,9 +217,10 @@ export function OpeningScene() {
         <AboutOverlay s={s} />
         <SkillPanel />
         <ProjectsOverlay s={s} selected={selected} onSelect={setSelected} />
+        <ContactOverlay s={s} />
       </div>
-      {/* scroll runway — corridor → About chamber → skills network → projects */}
-      <div aria-hidden className="pointer-events-none h-[1600vh] w-full" />
+      {/* scroll runway — corridor → About chamber → skills network → projects → departure */}
+      <div aria-hidden className="pointer-events-none h-[2000vh] w-full" />
 
     </>
   );

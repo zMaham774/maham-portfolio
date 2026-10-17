@@ -40,6 +40,14 @@ export type SequenceState = {
   lineBridge: number;
   /** 0..1 exhibition room and content reveal */
   gallery: number;
+  /** 0..1 responsive camera framing for the exhibition; rises with the gallery and holds */
+  frame: number;
+  /** 0..1 Departure Chamber presence (floor, light) */
+  departure: number;
+  /** 0..1 monumental doorway outline emergence */
+  door: number;
+  /** 0..1 contact HTML content */
+  contact: number;
   /** normalized scroll progress once the intro handed over */
   scroll: number;
 };
@@ -64,6 +72,10 @@ export const START: SequenceState = {
   links: 0,
   lineBridge: 0,
   gallery: 0,
+  frame: 0,
+  departure: 0,
+  door: 0,
+  contact: 0,
   scroll: 0,
 
 };
@@ -95,6 +107,11 @@ export const CHAMBER_STOP_Z = -110;
 /** Where the camera settles inside the skills lattice. */
 export const NETWORK_STOP_Z = -200;
 export const GALLERY_STOP_Z = -336;
+/** Where the camera settles facing the Departure doorway. */
+export const DEPART_STOP_Z = -470;
+export const DOOR_Z = -520;
+/** Share of the runway used by corridor → gallery; the rest is the Departure Chamber. */
+const JOURNEY_END = 0.8;
 
 /**
  * Phase 2: scroll drives the same shared state object the intro timeline used,
@@ -105,7 +122,9 @@ export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
   // Frame-rate independent easing on top of Lenis: absorbs any wheel spike or
   // dropped frame so the corridor→chamber handover never snaps.
   const k = 1 - Math.pow(0.0001, Math.min(dt, 0.1));
-  const t = (s.scroll = s.scroll + (target - s.scroll) * k);
+  const real = (s.scroll = s.scroll + (target - s.scroll) * k);
+  // earlier zones keep their original pacing, compressed into the first 80%
+  const t = Math.min(1, real / JOURNEY_END);
 
   // forward travel: corridor → chamber → lattice → exhibition.
   // every leg eases to zero velocity at its seam, so it reads as one glide
@@ -134,7 +153,14 @@ export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
   s.nodes = smooth(range(t, 0.7, 0.78)) * (1 - smooth(range(t, 0.83, 0.89)));
   s.links = smooth(range(t, 0.74, 0.81)) * (1 - smooth(range(t, 0.89, 0.95)));
   s.lineBridge = smooth(range(t, 0.84, 0.91)) * (1 - smooth(range(t, 0.96, 1)) * 0.6);
-  s.gallery = smooth(range(t, 0.89, 0.97));
+  s.frame = smooth(range(t, 0.89, 0.97));
+  // gallery rises, then fully fades so it can unmount before the Departure Chamber
+  const leave = smooth(range(real, 0.8, 0.85));
+  s.gallery = s.frame * (1 - leave);
+  s.lineBridge *= 1 - leave;
+  s.departure = smooth(range(real, 0.851, 0.92));
+  s.door = smooth(range(real, 0.86, 0.95));
+  s.contact = smooth(range(real, 0.935, 0.99));
 
   s.fogFar = lerp(
     lerp(END.fogFar, 230, smooth(range(t, 0.18, 0.55))),
@@ -144,6 +170,12 @@ export function applyScroll(s: SequenceState, p: number, dt = 1 / 60) {
   s.camY = lerp(lerp(lerp(END.camY, 2.35, smooth(range(t, 0.3, 0.55))), 5.2, smooth(range(t, 0.62, 0.83))), 5, smooth(range(t, 0.83, 0.97)));
   // raise the aim so the whole lattice sits above the floor, fully in frame
   s.lookY = lerp(lerp(3.1, 12.4, smooth(range(t, 0.6, 0.81))), 9.5, smooth(range(t, 0.85, 0.98)));
+  // final leg: past the last exhibit to the doorway, settling low and calm
+  const d = smooth(range(real, 0.8, 0.97));
+  s.camZ = lerp(s.camZ, DEPART_STOP_Z, d);
+  s.camY = lerp(s.camY, 3.2, d);
+  s.lookY = lerp(s.lookY, 7, d);
+  s.fogFar = lerp(s.fogFar, 150, d);
   s.glow = Math.max(0, 1 - s.open * 1.5);
   s.title = 0;
   s.hint = 1 - clamp01(t * 6);

@@ -111,7 +111,7 @@ export const PROJECT_DETAILS: Record<Slug, ProjectDetail> = {
     ],
     stack: ["C#", "WinForms"],
     links: [{ label: "GitHub", href: "https://github.com/zMaham774/faculty-workload-system" }],
-    collaborators: [{ name: "Dua Javaid", role: "Built 6 of the 16 forms", github: "https://github.com/dua123-maker", linkedin: "https://www.linkedin.com/in/dua-javaid-86611a318/" }],
+    collaborators: [{ name: "Dua Javaid", role: "Contributed 6 of the 16 forms and their associated functionality.", github: "https://github.com/dua123-maker", linkedin: "https://www.linkedin.com/in/dua-javaid-86611a318/" }],
     screenshots: [
       shot("faculty-workload-winforms", "winforms-login.jpg", 770, 430, "WinForms login screen for the Faculty Management System", "Login screen"),
       shot("faculty-workload-winforms", "winforms-faculty.jpg", 920, 510, "Faculty management screen with an add or edit form above a searchable table", "Faculty management: add or edit records, search and filter the table"),
